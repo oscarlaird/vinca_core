@@ -1,8 +1,6 @@
 from vinca_core.julianday import JulianDate, today
 from vinca_core.scheduling import Review, History
 
-TODAY = today()  # int representing day
-
 STUDY_ACTION_GRADES = ('again', 'hard', 'good', 'easy')
 BUREAU_ACTION_GRADES = ('edit', 'exit', 'preview')
 
@@ -147,7 +145,7 @@ def {_f}(self, new_value):
 
     def postpone(self, n=1):
         # 'Make card due n days after today. (default 1)'
-        tomorrow = TODAY + n
+        tomorrow = int(today()) + n
         # hour = self.due_date % 1
         self.due_date = tomorrow # + hour
         return f'Postponed until {self.due_date}.'
@@ -190,5 +188,5 @@ def {_f}(self, new_value):
 
     @property
     def is_due(self):
-        return self.due_date <= TODAY
+        return self.due_date <= today()
 
