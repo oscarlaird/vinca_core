@@ -160,14 +160,13 @@ Read `filter --help` for a complete list of predicates'''
                              'time': ' ORDER BY (edit_seconds + review_seconds)',
                              'total time': ' ORDER BY (edit_seconds + review_seconds)',
                              'recent': ' ORDER BY max(last_review_date, last_edit_date)',
-                             'merit': ' ORDER BY merit',
                               }
                 if criterion not in crit_dict:
                         return f'supply a criterion: {" | ".join(crit_dict.keys())}'
                 new_cardlist = self._copy()
                 new_cardlist._ORDER_BY = crit_dict[criterion]
                 # Sometimes it is natural to see the highest value first by default
-                reverse ^= criterion in ('recent', 'time', 'total time', 'merit') 
+                reverse ^= criterion in ('recent', 'time', 'total time')
                 direction = ' DESC' if reverse else ' ASC'
                 new_cardlist._ORDER_BY += direction
                 return new_cardlist

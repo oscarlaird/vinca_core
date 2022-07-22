@@ -15,7 +15,7 @@ class Card:
     _time_fields = ('edit_seconds','review_seconds','total_seconds')
 
     _id_fields = ('id',) + _media_id_fields # int valued
-    _int_fields = _id_fields + _time_fields + ('merit',)
+    _int_fields = _id_fields + _time_fields
     _str_fields = _misc_fields + _text_fields  # str valued
     _concrete_fields = _date_fields + _int_fields + _str_fields
 
@@ -23,7 +23,7 @@ class Card:
     _fields = _concrete_fields + _virtual_media_fields
 
     _editable_fields =  ('front_text','back_text','front_image_id','back_image_id','front_audio_id','back_audio_id',
-                         'card_type','visibility','due_date','tags','merit')
+                         'card_type','visibility','due_date','tags')
 
     # let us access key-val pairs from the dictionary as simple attributes
     # these in turn reference the more complex __getitem__ and __setitem__ methods
