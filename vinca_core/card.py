@@ -1,8 +1,23 @@
+'''
+Core functionality of a Vinca Card
+
+Some of this code implements a rudimentary ORM
+The __getitem__ and __setitem__ methods read and write SQLite on the fly.
+
+Methods which interface with the database:
+- _update (create an edit record changing the card's properties)
+- _log    (create a review record)
+
+Besides interfacing with the database:
+- history        (returns an array containing the history of the card)
+- hypo_due_dates (tells us what the due_date would be if we pressed good)
+- _schedule      (schedule the card based on its review history)
+'''
+
 from vinca_core.julianday import JulianDate, today
 from vinca_core.scheduling import Review, History
 
 STUDY_ACTION_GRADES = ('again', 'hard', 'good', 'easy')
-BUREAU_ACTION_GRADES = ('edit', 'exit', 'preview')
 
 class Card:
     # A card is a dictionary
@@ -10,8 +25,8 @@ class Card:
 
     _misc_fields = ('card_type','visibility','tags')
     _date_fields = ('create_date', 'due_date','last_edit_date','last_review_date')  # float valued
-    _text_fields = ('front_text', 'back_text')
-    _media_id_fields = ('front_image_id', 'back_image_id', 'front_audio_id', 'back_audio_id')
+    _text_fields = ('front_text', 'back_text','extra','hint','source','spelltest')
+    _media_id_fields = ('front_image_id', 'back_image_id', 'front_audio_id', 'back_audio_id', 'diagram_id','diagram_data_id')
     _time_fields = ('edit_seconds','review_seconds','total_seconds')
 
     _id_fields = ('id',) + _media_id_fields # int valued
@@ -19,26 +34,16 @@ class Card:
     _str_fields = _misc_fields + _text_fields  # str valued
     _concrete_fields = _date_fields + _int_fields + _str_fields
 
-    _virtual_media_fields = ('front_image','back_image','front_audio','back_audio')
+    _virtual_media_fields = ('front_image','back_image','front_audio','back_audio','diagram','diagram_data')
     _fields = _concrete_fields + _virtual_media_fields
 
-    _editable_fields =  ('front_text','back_text','front_image_id','back_image_id','front_audio_id','back_audio_id',
+    _editable_fields =  ('front_image_id','back_image_id','front_audio_id','back_audio_id','diagram_id','diagram_data_id',
+                         'front_text','back_text','source','extra','hint','spelltest',
                          'card_type','visibility','due_date','tags')
 
-    # let us access key-val pairs from the dictionary as simple attributes
-    # these in turn reference the more complex __getitem__ and __setitem__ methods
-    for _f in _fields:
-        exec(
-            f'''
-@property
-def {_f}(self):
-        return self["{_f}"]
-@{_f}.setter
-def {_f}(self, new_value):
-        self["{_f}"] = new_value
-'''
-        )
-
+    def __init__(self, id: int, cursor):
+        self._dict = dict(id=int(id))
+        self._cursor = cursor
 
     def hypo_due_dates(self, date = None, relative = True):
             # return relative hypothetical due dates
@@ -46,15 +51,9 @@ def {_f}(self, new_value):
             return {grade: self.history.hypothetical_due_date(grade, date = date, relative = relative)
                     for grade in STUDY_ACTION_GRADES}
 
-
-    def __init__(self, id: int, cursor):
-        self._cursor = cursor
-        self._dict = dict(id=int(id))
-
     def _exists(self):
         return bool(self._cursor.execute('SELECT COUNT(1) FROM cards WHERE id = ?',(self.id,)).fetchone()[0])
     __bool__ = _exists
-    
 
     # commit to SQL any variables that are changed (by editing, deleting, scheduling, etc.)
     def __setitem__(self, key, value):
@@ -67,6 +66,7 @@ def {_f}(self, new_value):
         else:
             self._cursor.execute(f'INSERT INTO edits (card_id, {key}) VALUES (?, ?)',(self.id, value))
             self._cursor.connection.commit()
+    __setattr__ = __setitem__ # easy dot notation
 
     def _set_virtual_media_field(self, key, value):
             media_id = self._upload_media(self._cursor, content=value)
@@ -134,6 +134,7 @@ def {_f}(self, new_value):
                 value = JulianDate(value)
             self._dict[key] = value
         return self._dict[key]
+    __getattr__ = __getitem__
 
     def _get_virtual_media_field(self, key):
         # if we query for "front_image" we need to access the database field front_image_id. So:
@@ -142,13 +143,6 @@ def {_f}(self, new_value):
         value = None if not media_id else self._cursor.execute(f'SELECT content FROM media '
                                             'WHERE id = ?', (media_id,)).fetchone()[0]
 
-
-    def postpone(self, n=1):
-        # 'Make card due n days after today. (default 1)'
-        tomorrow = int(today()) + n
-        # hour = self.due_date % 1
-        self.due_date = tomorrow # + hour
-        return f'Postponed until {self.due_date}.'
 
     def _log(self, grade, seconds, date = None):
         # Normally we don't need to specify the date because the SQLite database
@@ -173,11 +167,6 @@ def {_f}(self, new_value):
         self.due_date = self.history.new_due_date
         return self.due_date
 
-    def _collection_tags(self):
-        self._cursor.execute('SELECT tag FROM tags GROUP BY tag')
-        tags = [row[0] for row in self._cursor.fetchall()]
-        return tags
-
     @classmethod
     def _new_card(cls, cursor):
         cursor.execute("INSERT INTO edits DEFAULT VALUES")
@@ -189,4 +178,3 @@ def {_f}(self, new_value):
     @property
     def is_due(self):
         return self.due_date <= today()
-
