@@ -17,13 +17,13 @@ Besides interfacing with the database:
 from vinca_core.julianday import JulianDate, today
 from vinca_core.scheduling import Review, History
 
-STUDY_ACTION_GRADES = ('again', 'hard', 'good', 'easy')
+from functools import partialmethod
 
 class Card:
     # A card is a dictionary
     # its data is loaded from SQL on the fly and saved to SQL on the fly
 
-    _misc_fields = ('card_type','visibility','tags')
+    _misc_fields = ('card_type','visibility')
     _date_fields = ('create_date', 'due_date','last_edit_date','last_review_date')  # float valued
     _text_fields = ('front_text', 'back_text','extra','hint','source','spelltest')
     _media_id_fields = ('front_image_id', 'back_image_id', 'front_audio_id', 'back_audio_id', 'diagram_id','diagram_data_id')
@@ -39,17 +39,11 @@ class Card:
 
     _editable_fields =  ('front_image_id','back_image_id','front_audio_id','back_audio_id','diagram_id','diagram_data_id',
                          'front_text','back_text','source','extra','hint','spelltest',
-                         'card_type','visibility','due_date','tags')
+                         'card_type','visibility','due_date')
 
     def __init__(self, id: int, cursor):
         self._dict = dict(id=int(id))
         self._cursor = cursor
-
-    def hypo_due_dates(self, date = None, relative = True):
-            # return relative hypothetical due dates
-            # e.g. +10 days if you press 'hard'
-            return {grade: self.history.hypothetical_due_date(grade, date = date, relative = relative)
-                    for grade in STUDY_ACTION_GRADES}
 
     def _exists(self):
         return bool(self._cursor.execute('SELECT COUNT(1) FROM cards WHERE id = ?',(self.id,)).fetchone()[0])
@@ -144,13 +138,8 @@ class Card:
                                             'WHERE id = ?', (media_id,)).fetchone()[0]
 
 
-    def _log(self, grade, seconds, date = None):
-        # Normally we don't need to specify the date because the SQLite database
-        # will automatically timestamp new records.
-        # But becaues vinca uses local timestamps, if we are using vinca over the
-        # internet, then the client's time could be different from the server
-        # in which case it is necessary for the client to send a timestamp
-        log = {'card_id':self.id, 'seconds': seconds, 'grade':grade}
+    def _log_review(self, grade, seconds, new_due_date, date = None):
+        log = {'card_id':self.id, 'seconds': seconds, 'grade':grade, 'new_due_date': new_due_date}
         if date: log['date'] = date
         field_names    = ','.join(log)            # card_id, seconds, grade
         question_marks = ','.join('?' * len(log)) # ?,?,?
@@ -178,3 +167,28 @@ class Card:
     @property
     def is_due(self):
         return self.due_date <= today()
+
+    def remove_tag(self, tag):
+        self._cursor.execute('INSERT INTO tag_edits (card_id, tag, active) VALUES (?, ?, ?)', (self.id, tag, 0))
+        self._cursor.connection.commit()
+
+    def tags(self):
+        self._cursor.execute('SELECT tag FROM tags WHERE card_id = ?',(self.id,))
+        return [row[0] for row in self._cursor.fetchall()]
+
+    def add_tag(self, tag):
+        self._cursor.execute('INSERT INTO tag_edits (card_id, tag) VALUES (?, ?)', (self.id, tag))
+        self._cursor.connection.commit()
+
+    def _change_visibility(self, visibility, date = None):
+        assert visibility in ('deleted','visible','purged')
+        date = date or julianday.now()
+        self._cursor.execute('INSERT INTO edits (card_id, visibility, date) VALUES (?, ?, ?)',(self.id, visibility, date))
+        self._cursor.connection.commit()
+    _delete = partialmethod(_change_visibility, 'deleted')
+    _restore = partialmethod(_change_visibility, 'visible')
+    _purge = partialmethod(_change_visibility, 'purged')
+
+
+
+

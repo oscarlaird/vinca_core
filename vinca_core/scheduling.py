@@ -75,7 +75,7 @@ class History(list):
             return self.last_reset_date + 0.003 # due four minutes later
         return int(self.last_study_date) + self.interval
 
-    def hypothetical_due_date(self, grade, date=None, seconds=10, relative=False):
+    def hypo_due_date(self, grade, date=None, seconds=10, relative=False):
         if not date:
             date = today()
         'new due date if we received a given grade.'
