@@ -12,6 +12,7 @@ Besides interfacing with the database:
 - history        (returns an array containing the history of the card)
 - hypo_due_dates (tells us what the due_date would be if we pressed good)
 - _schedule      (schedule the card based on its review history)
+
 '''
 
 from vinca_core.julianday import JulianDate, today
