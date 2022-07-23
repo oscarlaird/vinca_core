@@ -42,8 +42,8 @@ class Card:
                          'front_text','back_text','source','extra','hint','spelltest',
                          'card_type','visibility','due_date')
 
-    def __init__(self, id: int, cursor):
-        self._dict = dict(id=int(id))
+    def __init__(self, card_id, cursor):
+        self._dict = dict(id=int(card_id))
         self._cursor = cursor
 
     def _exists(self):
